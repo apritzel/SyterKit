@@ -24,8 +24,11 @@ set(CONFIG_USE_DRAM_PAYLOAD_FILE_PATH "${CMAKE_SOURCE_DIR}/board/avaota-a1/paylo
 set(CONFIG_USE_DRAM_PAYLOAD_SECTION "init_dram_bin")
 
 # Set the cross-compile toolchain
-set(CROSS_COMPILE "arm-none-eabi-")
-set(CROSS_COMPILE ${CROSS_COMPILE} CACHE STRING "CROSS_COMPILE Toolchain")
+if(NOT DEFINED ENV{CROSS_COMPILE})
+    set(CROSS_COMPILE "arm-none-eabi-")
+else()
+    set(CROSS_COMPILE $ENV{CROSS_COMPILE} CACHE STRING "CROSS_COMPILE Toolchain")
+endif()
 
 # Set the C and C++ compilers
 set(CMAKE_C_COMPILER "${CROSS_COMPILE}gcc")
