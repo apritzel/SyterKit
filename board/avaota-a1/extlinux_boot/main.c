@@ -555,6 +555,7 @@ static int load_extlinux(image_info_t *image, uint64_t dram_size) {
             goto _error;
         }
     }
+    chosen_node = fdt_find_or_add_subnode(image->of_dest, 0, "chosen");
     len = 0;
     /* Get bootargs string */
     char *bootargs = (char *) smalloc(4096);
@@ -591,6 +592,7 @@ static int load_extlinux(image_info_t *image, uint64_t dram_size) {
     strcat(bootargs, " mac1_addr=");
     strcat(bootargs, mac1_address);
 
+    chosen_node = fdt_find_or_add_subnode(image->of_dest, 0, "chosen");
 _add_dts_size:
     /* Modify bootargs string */
     ret = fdt_setprop_string(image->of_dest, chosen_node, "bootargs", skip_spaces(bootargs));
