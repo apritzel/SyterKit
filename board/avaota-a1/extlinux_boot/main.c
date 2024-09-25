@@ -264,54 +264,53 @@ static char *skip_spaces(char *str) {
     return str;
 }
 
-static char *find_substring(char *source, const char *target) {
-    char *pos = strstr(source, target);
-    if (pos) {
-        return pos + strlen(target);
-    }
-    return NULL;
-}
+static void parse_extlinux_data(char *config, ext_linux_data_t *data)
+{
+	char *line, *keyword, *value, *eol = config, *comment, *end;
 
-static char *copy_until_newline_or_end(char *source) {
-    if (!source) return NULL;
+	for (line = config; true; line = eol + 1) {
+		if (!eol)
+			break;
+		eol = strchr(line, '\n');
+		if (eol)
+			*eol = '\0';
 
-    source = skip_spaces(source);
+		comment = strchr(line, '#');
+		if (comment)
+			*comment = '\0';
 
-    char *end = strchr(source, '\n');
-    size_t len;
-    if (end) {
-        len = end - source;
-    } else {
-        len = strlen(source);
-    }
-    char *dest = smalloc(len + 1);
-    if (!dest) return NULL;
+		/* Skip initial spaces */
+		for (keyword = line; *keyword == ' ' || *keyword == '\t';
+		     keyword++)
+			;
+		if (*keyword == '\0')		/* empty line: ignore */
+			continue;
 
-    strncpy(dest, source, len);
-    dest[len] = '\0';
-    return dest;
-}
+		/* find end of keyword - first whitespace */
+		for (end = keyword; *end != ' ' && *end != '\t'; end++)
+			if (*end == '\0')
+				break;
+		if (*end == '\0')		/* just a keyword: ignore */
+			continue;
+		*end = '\0';
 
-static void parse_extlinux_data(char *config, ext_linux_data_t *data) {
-    char *start;
+		/*skip spaces to find beginning of argument */
+		for (value = end + 1; *value == ' ' || *value == '\t'; value++)
+			;
 
-    start = find_substring(config, "label ");
-    data->os = copy_until_newline_or_end(start);
-
-    start = find_substring(config, "kernel ");
-    data->kernel = copy_until_newline_or_end(start);
-
-    start = find_substring(config, "initrd ");
-    data->initrd = copy_until_newline_or_end(start);
-
-    start = find_substring(config, "fdt ");
-    data->fdt = copy_until_newline_or_end(start);
-
-    start = find_substring(config, "fdtoverlay ");
-    data->dtbo = copy_until_newline_or_end(start);
-
-    start = find_substring(config, "append ");
-    data->append = copy_until_newline_or_end(start);
+		if (!strcmp(keyword, "label"))
+			data->os = value;
+		if (!strcmp(keyword, "kernel"))
+			data->kernel = value;
+		if (!strcmp(keyword, "initrd"))
+			data->initrd = value;
+		if (!strcmp(keyword, "fdt"))
+			data->fdt = value;
+		if (!strcmp(keyword, "fdtoverlay"))
+			data->dtbo = value;
+		if (!strcmp(keyword, "append"))
+			data->append = value;
+	}
 }
 
 static int fdt_pack_reg(const void *fdt, void *buf, uint64_t address, uint64_t size) {
