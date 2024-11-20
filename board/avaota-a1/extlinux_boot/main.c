@@ -32,11 +32,6 @@
 #include <sys-sdhci.h>
 #include <uart.h>
 
-#include "spi_lcd.c"
-
-#define CONFIG_SPLASH_LOAD_ADDR (0x40080000)
-#define CONFIG_SPLASH_FILENAME "splash.bin"
-
 #define CONFIG_BL31_FILENAME "bl31.bin"
 #define CONFIG_BL31_LOAD_ADDR (0x48000000)
 
@@ -105,9 +100,6 @@ typedef struct {
 
     uint8_t *scp_dest;
     char scp_filename[FILENAME_MAX_LEN];
-
-    uint8_t *splash_dest;
-    char splash_filename[FILENAME_MAX_LEN];
 
     uint8_t *kernel_dest;
     uint8_t *ramdisk_dest;
@@ -219,13 +211,6 @@ static int load_sdcard(image_info_t *image) {
     ret = fatfs_loadimage(image->extlinux_filename, image->extlinux_dest);
     if (ret)
         return ret;
-
-    printk_info("FATFS: read %s addr=%x\n", image->splash_filename, (uint32_t) image->splash_dest);
-    ret = fatfs_loadimage(image->splash_filename, image->splash_dest);
-    if (ret)
-        printk_info("FATFS: Splash load fail, Leave Black Screen.\n");
-    else
-        LCD_Show_Splash(image->splash_dest);
 
     /* umount fs */
     fret = f_mount(0, "", 0);
@@ -729,8 +714,6 @@ int main(void) {
     /* Initialize the small memory allocator. */
     smalloc_init(CONFIG_HEAP_BASE, CONFIG_HEAP_SIZE);
 
-    LCD_Init();
-
     sunxi_nsi_init();
 
     /* Clear the image_info_t struct. */
@@ -742,18 +725,15 @@ int main(void) {
     image.of_dest = (uint8_t *) CONFIG_DTB_LOAD_ADDR;
     image.ramdisk_dest = (uint8_t *) CONFIG_INITRD_LOAD_ADDR;
     image.kernel_dest = (uint8_t *) CONFIG_KERNEL_LOAD_ADDR;
-    image.splash_dest = (uint8_t *) CONFIG_SPLASH_LOAD_ADDR;
     image.of_overlay_dest = (uint8_t *) CONFIG_DTBO_LOAD_ADDR;
 
     strcpy(image.bl31_filename, CONFIG_BL31_FILENAME);
     strcpy(image.scp_filename, CONFIG_SCP_FILENAME);
     strcpy(image.extlinux_filename, CONFIG_EXTLINUX_FILENAME);
-    strcpy(image.splash_filename, CONFIG_SPLASH_FILENAME);
 
     /* Initialize the SD host controller. */
     if (sunxi_sdhci_init(&sdhci0) != 0) {
         printk_error("SMHC: %s controller init failed\n", sdhci0.name);
-        LCD_ShowString(0, 92, "SMHC: SDC0 controller init failed", SPI_LCD_COLOR_GREEN, SPI_LCD_COLOR_BLACK, 12);
         goto _fail;
     } else {
         printk_info("SMHC: %s controller initialized\n", sdhci0.name);
@@ -765,7 +745,6 @@ int main(void) {
         /* Initialize the SD host controller. */
         if (sunxi_sdhci_init(&sdhci2) != 0) {
             printk_error("SMHC: %s controller init failed\n", sdhci2.name);
-            LCD_ShowString(0, 92, "SMHC: SDC2 controller init failed", SPI_LCD_COLOR_GREEN, SPI_LCD_COLOR_BLACK, 12);
             goto _fail;
         } else {
             printk_info("SMHC: %s controller initialized\n", sdhci2.name);
@@ -783,7 +762,6 @@ int main(void) {
 
         if (sunxi_sdhci_init(&sdhci2) != 0) {
             printk_error("SMHC: %s controller init failed\n", sdhci2.name);
-            LCD_ShowString(0, 92, "SMHC: SDC2 controller init failed", SPI_LCD_COLOR_GREEN, SPI_LCD_COLOR_BLACK, 12);
             goto _fail;
         } else {
             if (sdmmc_init(&card0, &sdhci2) != 0) {
@@ -799,11 +777,8 @@ int main(void) {
         }
     }
 
-    LCD_Open_BLK();
-
     if (load_extlinux(&image, dram_size) != 0) {
         printk_error("EXTLINUX: load extlinux failed\n");
-        LCD_ShowString(0, 92, "EXTLINUX: load extlinux failed", SPI_LCD_COLOR_GREEN, SPI_LCD_COLOR_BLACK, 12);
         goto _fail;
     }
 
@@ -820,11 +795,6 @@ int main(void) {
     printk_info("ATF: Kernel addr: 0x%08x\n", atf_head->nos_base);
     printk_info("ATF: Kernel DTB addr: 0x%08x\n", atf_head->dtb_base);
 
-    /* flush buffer */
-    LCD_ShowString(0, 0, "SyterKit Now Booting Linux", SPI_LCD_COLOR_GREEN, SPI_LCD_COLOR_BLACK, 12);
-    LCD_ShowString(0, 12, "Kernel Addr: 0x40800000", SPI_LCD_COLOR_GREEN, SPI_LCD_COLOR_BLACK, 12);
-    LCD_ShowString(0, 24, "DTB Addr: 0x40400000", SPI_LCD_COLOR_GREEN, SPI_LCD_COLOR_BLACK, 12);
-
     clean_syterkit_data();
 
     gicr_set_waker();
@@ -837,11 +807,6 @@ int main(void) {
     jmp_to_fel();
 
 _fail:
-    LCD_ShowString(0, 0, "SyterKit Boot Failed", SPI_LCD_COLOR_RED, SPI_LCD_COLOR_BLACK, 12);
-    LCD_ShowString(0, 12, "Please Connect UART for Debug info", SPI_LCD_COLOR_RED, SPI_LCD_COLOR_BLACK, 12);
-    LCD_ShowString(0, 24, "Error Info:", SPI_LCD_COLOR_RED, SPI_LCD_COLOR_BLACK, 12);
-    LCD_Open_BLK();
-
     printk_error("SyterKit Boot Failed, System into software_interrupt panic. Please reset your board.\n");
 
     panic();
